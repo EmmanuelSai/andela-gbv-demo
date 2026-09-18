@@ -1,0 +1,31 @@
+# Test-only placeholders. Never use these outside automated tests.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gbv_db}
+    username: ${DB_USERNAME:emmanuelsai}
+    password: ${DB_PASSWORD:}
+
+twilio:
+  account-sid: ACtest0000000000000000000000000000
+  auth-token: test-twilio-auth-token
+  whatsapp-number: whatsapp:+15005550006
+  webhook-url: http://localhost:8080/api/whatsapp/webhook
+  validate-signature: false
+
+encryption:
+  key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+
+jwt:
+  secret: test-jwt-secret-must-be-at-least-32-chars
+
+portal:
+  admin-username: admin
+  admin-password: test-admin-password
+  manager-username: manager
+  manager-password: test-manager-password
+  cors-origins: http://localhost:4200
+
+logging:
+  level:
+    com.andela.gbv.demo: WARN
+    com.twilio: WARN

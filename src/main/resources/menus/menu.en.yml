@@ -1,0 +1,541 @@
+version: 2
+
+settings:
+  backKey: "0"
+  backLabel: "Back"
+  homeKey: "00"
+  homeLabel: "Main menu"
+  exitKey: "EXIT"
+  exitLabel: "Clear chat"
+  invalidInputMessage: "I didn't understand that. Please reply with a number from the list."
+  sessionTimeoutMinutes: 30
+
+# ============================================================
+# GLOBAL BEHAVIOR NOTES
+# ------------------------------------------------------------
+# - Quick exit is handled by MenuEngine before any node is
+#   processed (typing EXIT clears the session and sends a
+#   neutral message).
+# - Every node is designed for trace-safety: no notification-
+#   visible words, no history that would alarm an abuser.
+# - Femicide risk is NOT a menu label. It is computed from
+#   intake answers (strangulation, threats to kill, weapon use,
+#   separation) via FemicideRiskAssessor.
+# ============================================================
+
+menus:
+
+  # ============================================================
+  # ENTRY POINT
+  # ============================================================
+  main:
+    type: MENU
+    text: |
+      This is a private and confidential space. You are not alone.
+      What would you like to do?
+    options:
+      - label: "I need help now"
+        next: "help_now"
+      - label: "I want to report something"
+        next: "report_menu"
+      - label: "I want information and support"
+        next: "info_support"
+      - label: "Talk to a human"
+        next: "human_connect"
+      - label: "Change language"
+        next: "select_language"
+
+  # ============================================================
+  # BRANCH 1: I NEED HELP NOW
+  # ============================================================
+  help_now:
+    type: MENU
+    text: |
+      You are not alone. This is a safe space.
+      What is happening right now?
+    options:
+      - label: "I am in danger right now"
+        next: "immediate_danger"
+      - label: "I was attacked or hurt"
+        next: "recent_attack"
+      - label: "I am being threatened"
+        next: "threat_report"
+      - label: "I need to leave safely"
+        next: "safety_planning"
+
+  immediate_danger:
+    type: MENU
+    text: |
+      If you are in immediate danger, please call 999 now.
+      If it is not safe to call, or you want to talk to someone first,
+      I can connect you with a trained counsellor.
+      What would you like to do?
+    options:
+      - label: "Connect me to a counsellor now"
+        next: "connect_counsellor_urgent"
+      - label: "I can't call 999 safely"
+        next: "connect_counsellor_urgent"
+      - label: "Just give me information"
+        next: "info_support"
+
+  connect_counsellor_urgent:
+    type: MENU
+    text: |
+      Please choose how you would like to be contacted.
+      Your choice is kept private and will not be shared with anyone else.
+    options:
+      - label: "Message me here on WhatsApp"
+        next: "connect_whatsapp_consent"
+      - label: "Call me — I can talk safely"
+        next: "connect_call_consent"
+      - label: "Do not contact me — I will reach out"
+        next: "info_support"
+
+  connect_whatsapp_consent:
+    type: INPUT
+    text: |
+      Please describe what is happening, in your own words.
+      You can type or send a voice note.
+      Take your time. You can type EXIT at any time to clear this chat.
+    action: "gbvIntakeHandler"
+    next: "risk_assessment_prompt"
+
+  connect_call_consent:
+    type: INPUT
+    text: |
+      Please share a safe time and number we can call, or describe what
+      is happening and a counsellor will arrange a safe call.
+      You can type or send a voice note.
+      Take your time. You can type EXIT at any time.
+    action: "gbvIntakeHandler"
+    next: "risk_assessment_prompt"
+
+  # ============================================================
+  # BRANCH 2: I WAS ATTACKED OR HURT
+  # ============================================================
+  recent_attack:
+    type: INPUT
+    text: |
+      I am sorry this happened to you. You did not deserve it.
+      Please describe what happened in your own words.
+      You can type or send a voice note.
+      Take your time. You can type EXIT at any time.
+    action: "gbvIntakeHandler"
+    next: "risk_assessment_prompt"
+
+  # ============================================================
+  # BRANCH 3: I AM BEING THREATENED
+  # ============================================================
+  threat_report:
+    type: INPUT
+    text: |
+      Thank you for telling me. Your safety matters.
+      Please describe the threats in your own words.
+      You can type or send a voice note.
+      Take your time. You can type EXIT at any time.
+    action: "gbvIntakeHandler"
+    next: "risk_assessment_prompt"
+
+  # ============================================================
+  # SILENT FEMICIDE RISK ASSESSMENT
+  # ------------------------------------------------------------
+  # This flow captures the strongest known predictors of
+  # femicide WITHOUT naming the outcome. Answers are classified
+  # by FemicideRiskAssessor into LOW / ELEVATED / IMMINENT.
+  # IMMINENT triggers a silent escalation to a specialist.
+  # ============================================================
+  risk_assessment_prompt:
+    type: MENU
+    text: |
+      Thank you for trusting me with this.
+      To help you safely, I need to ask a few short questions.
+      These questions are only used to connect you with the right support.
+    options:
+      - label: "Continue"
+        next: "risk_q_strangulation"
+      - label: "Skip questions"
+        next: "after_report"
+
+  risk_q_strangulation:
+    type: MENU
+    text: |
+      Has the person who hurt you ever:
+      tried to choke or strangle you?
+    options:
+      - label: "Yes"
+        next: "risk_flag_strangulation"
+      - label: "No"
+        next: "risk_q_threat"
+      - label: "I'd rather not say"
+        next: "risk_q_threat"
+
+  risk_flag_strangulation:
+    type: ACTION
+    action: "femicideRiskHandler"
+    contextFlag: "strangulation"
+    next: "risk_q_threat"
+
+  risk_q_threat:
+    type: MENU
+    text: |
+      Has the person who hurt you ever:
+      threatened to kill you?
+    options:
+      - label: "Yes"
+        next: "risk_flag_threat"
+      - label: "No"
+        next: "risk_q_weapon"
+      - label: "I'd rather not say"
+        next: "risk_q_weapon"
+
+  risk_flag_threat:
+    type: ACTION
+    action: "femicideRiskHandler"
+    contextFlag: "threatsToKill"
+    next: "risk_q_weapon"
+
+  risk_q_weapon:
+    type: MENU
+    text: |
+      Has the person who hurt you ever:
+      used or threatened you with a weapon?
+    options:
+      - label: "Yes"
+        next: "risk_flag_weapon"
+      - label: "No"
+        next: "risk_q_separation"
+      - label: "I'd rather not say"
+        next: "risk_q_separation"
+
+  risk_flag_weapon:
+    type: ACTION
+    action: "femicideRiskHandler"
+    contextFlag: "weaponUse"
+    next: "risk_q_separation"
+
+  risk_q_separation:
+    type: MENU
+    text: |
+      Have you recently separated from, or tried to leave,
+      the person who hurt you?
+    options:
+      - label: "Yes"
+        next: "risk_flag_separation"
+      - label: "No"
+        next: "risk_q_stalking"
+      - label: "I'd rather not say"
+        next: "risk_q_stalking"
+
+  risk_flag_separation:
+    type: ACTION
+    action: "femicideRiskHandler"
+    contextFlag: "recentSeparation"
+    next: "risk_q_stalking"
+
+  risk_q_stalking:
+    type: MENU
+    text: |
+      Does the person who hurt you:
+      follow you, watch you, or check your phone or messages?
+    options:
+      - label: "Yes"
+        next: "risk_flag_stalking"
+      - label: "No"
+        next: "risk_assessment_done"
+      - label: "I'd rather not say"
+        next: "risk_assessment_done"
+
+  risk_flag_stalking:
+    type: ACTION
+    action: "femicideRiskHandler"
+    contextFlag: "stalkingOrMonitoring"
+    next: "risk_assessment_done"
+
+  risk_assessment_done:
+    type: ACTION
+    action: "riskSummaryHandler"
+    next: "after_report"
+
+  # ============================================================
+  # BRANCH 4: SAFETY PLANNING
+  # ============================================================
+  safety_planning:
+    type: MENU
+    text: |
+      A safety plan helps you prepare for leaving or for an emergency.
+      It is private and does not have to be shared with anyone.
+      What would you like help with?
+    options:
+      - label: "Preparing an emergency bag"
+        next: "safety_bag"
+      - label: "A safe word or code with a friend"
+        next: "safety_code"
+      - label: "Planning a safe route and time to leave"
+        next: "safety_route"
+      - label: "Saving evidence privately"
+        next: "safety_vault"
+      - label: "Talk to a counsellor about a plan"
+        next: "connect_counsellor_urgent"
+
+  safety_bag:
+    type: ACTION
+    action: "safetyInfoBagHandler"
+    next: "after_safety"
+
+  safety_code:
+    type: ACTION
+    action: "safetyInfoCodeHandler"
+    next: "after_safety"
+
+  safety_route:
+    type: ACTION
+    action: "safetyInfoRouteHandler"
+    next: "after_safety"
+
+  after_safety:
+    type: MENU
+    text: |
+      Would you like to do anything else?
+    options:
+      - label: "Save evidence privately"
+        next: "safety_vault"
+      - label: "Connect with a counsellor"
+        next: "connect_counsellor_urgent"
+      - label: "Return to main menu"
+        next: "main"
+
+  # ============================================================
+  # BRANCH 5: WITNESS REPORTING
+  # ============================================================
+  report_menu:
+    type: MENU
+    text: |
+      Thank you for speaking up. Your report can help protect someone.
+      You can stay completely anonymous.
+      What would you like to report?
+    options:
+      - label: "A threat I witnessed"
+        next: "witness_threat"
+      - label: "A serious attack I witnessed"
+        next: "witness_attack"
+      - label: "A woman or girl who is missing"
+        next: "witness_missing"
+      - label: "A death I believe was not natural"
+        next: "witness_death"
+      - label: "Something else"
+        next: "witness_other"
+
+  witness_threat:
+    type: INPUT
+    text: |
+      Please describe the threat you witnessed, in your own words.
+      You can type, send a voice note, or share a photo.
+      Your report will be logged anonymously.
+    action: "witnessReportHandler"
+    next: "witness_consent_menu"
+
+  witness_attack:
+    type: INPUT
+    text: |
+      I am sorry you are carrying this. Please describe what you saw,
+      in your own words.
+      You can type, send a voice note, or share a photo.
+      Your report will be logged anonymously.
+    action: "witnessReportHandler"
+    next: "witness_consent_menu"
+
+  witness_missing:
+    type: INPUT
+    text: |
+      Please describe who is missing and when they were last seen.
+      Any details help: name (if you know it), location, date, and
+      what they were wearing. You can type, send a voice note, or share a photo.
+      Your report will be logged anonymously.
+    action: "witnessReportHandler"
+    next: "witness_consent_menu"
+
+  witness_death:
+    type: INPUT
+    text: |
+      I am sorry you are carrying this. Please describe what you saw,
+      in your own words. This can help a family find answers.
+      You can stay completely anonymous.
+    action: "witnessReportHandler"
+    next: "witness_consent_menu"
+
+  witness_other:
+    type: INPUT
+    text: |
+      Please describe what you would like to report, in your own words.
+      You can type, send a voice note, or share a photo.
+    action: "witnessReportHandler"
+    next: "witness_consent_menu"
+
+  witness_consent_menu:
+    type: MENU
+    text: |
+      Would you like a protection officer to be able to reach you?
+      You can change your mind at any time.
+    options:
+      - label: "No — keep me anonymous"
+        next: "after_report"
+      - label: "Yes — I will share a safe way to reach me"
+        next: "witness_contact_safe"
+      - label: "Let me think about it"
+        next: "after_report"
+
+  witness_contact_safe:
+    type: INPUT
+    text: |
+      Please share a safe way to reach you — for example, a different
+      number, a safe time to call, or a code word. Your contact details
+      will only be visible to a vetted protection officer.
+    action: "witnessContactHandler"
+    next: "after_report"
+
+  # ============================================================
+  # SAFETY VAULT
+  # ============================================================
+  safety_vault:
+    type: INPUT
+    text: |
+      Please send the evidence you want to save — a photo, a screenshot,
+      a voice note, or a document.
+      It will be encrypted and stored privately.
+      Only you can unlock it, using a token I will give you.
+    action: "safetyVaultHandler"
+    next: "safety_vault_done"
+
+  safety_vault_done:
+    type: MENU
+    text: |
+      Your evidence has been saved securely.
+      Would you like to do anything else?
+    options:
+      - label: "Get referral information"
+        next: "referrals"
+      - label: "Talk to a counsellor"
+        next: "connect_counsellor_urgent"
+      - label: "Return to main menu"
+        next: "main"
+
+  # ============================================================
+  # AFTER-REPORT
+  # ============================================================
+  after_report:
+    type: MENU
+    text: |
+      Thank you. A trained case manager will review this.
+      Would you like to:
+    options:
+      - label: "Save evidence privately"
+        next: "safety_vault"
+      - label: "Get referral information"
+        next: "referrals"
+      - label: "Talk to a counsellor"
+        next: "connect_counsellor_urgent"
+      - label: "Return to main menu"
+        next: "main"
+
+  # ============================================================
+  # REFERRALS
+  # ============================================================
+  referrals:
+    type: MENU
+    text: "Select your location:"
+    options:
+      - label: "Nairobi"
+        next: "referral_nairobi"
+      - label: "Mombasa"
+        next: "referral_mombasa"
+      - label: "Kisumu"
+        next: "referral_kisumu"
+      - label: "Other"
+        next: "referral_other"
+
+  referral_nairobi:
+    type: ACTION
+    action: "referralHandler"
+    contextLocation: "DARESSALAAM"
+    next: "after_referral"
+
+  referral_mombasa:
+    type: ACTION
+    action: "referralHandler"
+    contextLocation: "ARUSHA"
+    next: "after_referral"
+
+  referral_kisumu:
+    type: ACTION
+    action: "referralHandler"
+    contextLocation: "DODOMA"
+    next: "after_referral"
+
+  referral_other:
+    type: ACTION
+    action: "referralHandler"
+    contextLocation: "OTHER"
+    next: "after_referral"
+
+  after_referral:
+    type: MENU
+    text: "Would you like to do anything else?"
+    options:
+      - label: "Talk to a counsellor"
+        next: "connect_counsellor_urgent"
+      - label: "Return to main menu"
+        next: "main"
+
+  # ============================================================
+  # INFORMATION & SUPPORT
+  # ============================================================
+  info_support:
+    type: ACTION
+    action: "infoSupportHandler"
+    next: "after_info"
+
+  after_info:
+    type: MENU
+    text: "Would you like to do anything else?"
+    options:
+      - label: "Talk to a counsellor"
+        next: "connect_counsellor_urgent"
+      - label: "Return to main menu"
+        next: "main"
+
+  # ============================================================
+  # HUMAN CONNECT
+  # ============================================================
+  human_connect:
+    type: ACTION
+    action: "humanConnectHandler"
+    next: "after_human"
+
+  after_human:
+    type: MENU
+    text: "Is there anything else I can help with?"
+    options:
+      - label: "Return to main menu"
+        next: "main"
+
+  # ============================================================
+  # LANGUAGE
+  # ============================================================
+  select_language:
+    type: MENU
+    text: "Choose a language:"
+    options:
+      - label: "English"
+        next: "set_lang_en"
+      - label: "Kiswahili"
+        next: "set_lang_sw"
+
+  set_lang_en:
+    type: ACTION
+    action: "setLanguageEnHandler"
+    next: "main"
+
+  set_lang_sw:
+    type: ACTION
+    action: "setLanguageSwHandler"
+    next: "main"
